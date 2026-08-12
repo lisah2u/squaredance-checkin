@@ -1,3 +1,11 @@
 [build]
   command = "npm run build"
   publish = "build"
+
+[build.environment]
+  # Not a credential on its own — it's the (non-secret) Airtable base
+  # identifier, already hardcoded as a fallback default in
+  # src/lib/server/airtable.js and documented in the README. Netlify's
+  # secrets scanner otherwise flags it as a false-positive leak because
+  # the same value also appears in source/docs.
+  SECRETS_SCAN_OMIT_KEYS = "AIRTABLE_BASE_ID"
