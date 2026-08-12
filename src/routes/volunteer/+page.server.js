@@ -1,5 +1,5 @@
 import { fail } from '@sveltejs/kit';
-import { getPartyDetails, createVisit, findTodaysEvent } from '$lib/server/airtable.js';
+import { getPartyDetails, createVisit, findTodaysEvent, findOrCreateEvent } from '$lib/server/airtable.js';
 import { todaysEvent } from '$lib/utils/event.js';
 
 export async function load() {
@@ -9,6 +9,15 @@ export async function load() {
 }
 
 export const actions = {
+	// Only reachable while logged in (hooks.server.js gates all of /volunteer) —
+	// this is the one place today's Event record gets created, so check-in
+	// opening is always a deliberate, authenticated action.
+	openToday: async () => {
+		const { eventName, visitDate } = todaysEvent();
+		await findOrCreateEvent(eventName, visitDate);
+		return { opened: true };
+	},
+
 	checkIn: async ({ request }) => {
 		const data = await request.formData();
 		const partyId = data.get('partyId')?.toString() ?? '';

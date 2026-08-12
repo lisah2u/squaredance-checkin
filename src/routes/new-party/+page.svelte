@@ -2,6 +2,8 @@
 	import { enhance } from '$app/forms';
 	import VisitFields from '$lib/components/VisitFields.svelte';
 
+	let { data } = $props();
+
 	let step = $state('details'); // 'details' | 'adults' | 'visit' | 'success'
 	let stepError = $state('');
 	let submitting = $state(false);
@@ -72,6 +74,13 @@
 </script>
 
 <h1 class="text-xl font-semibold">Welcome!</h1>
+
+{#if !data.checkInOpen}
+	<div class="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
+		<p class="font-medium">Check-in isn't open right now</p>
+		<p class="mt-1 text-sm text-slate-600">Please see a volunteer at the door.</p>
+	</div>
+{:else}
 <p class="mt-2 text-sm text-slate-500">Tell us a bit about your party.</p>
 
 {#if step !== 'success'}
@@ -299,4 +308,5 @@
 		<p class="text-lg font-medium">Party created & checked in!</p>
 		<p class="mt-1 text-sm text-slate-600">Welcome, {successName}. Enjoy the dance!</p>
 	</div>
+{/if}
 {/if}

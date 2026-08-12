@@ -19,6 +19,7 @@
 	let submitting = $state(false);
 	let errorMessage = $state('');
 	let successName = $state('');
+	let opening = $state(false);
 
 	/** @type {ReturnType<typeof setTimeout> | undefined} */
 	let debounceTimer;
@@ -77,9 +78,27 @@
 {#if !data.checkInOpen}
 	<div class="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
 		<p class="font-medium">Check-in is locked</p>
-		<p class="mt-1 text-sm text-slate-600">
-			No dance is scheduled for today in Airtable yet. Add today's Event record to unlock check-in.
-		</p>
+		<p class="mt-1 text-sm text-slate-600">No dance is scheduled for today yet.</p>
+		<form
+			method="POST"
+			action="?/openToday"
+			class="mt-4"
+			use:enhance={() => {
+				opening = true;
+				return async ({ update }) => {
+					opening = false;
+					await update();
+				};
+			}}
+		>
+			<button
+				type="submit"
+				disabled={opening}
+				class="rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-50"
+			>
+				{opening ? 'Opening…' : "Open check-in for today's dance"}
+			</button>
+		</form>
 	</div>
 {:else if step === 'search'}
 	<p class="mt-2 text-sm text-slate-500">Search by name, city, or email.</p>

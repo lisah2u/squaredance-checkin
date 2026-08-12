@@ -1,9 +1,15 @@
 import { fail } from '@sveltejs/kit';
-import { createParty, createAdults, createVisit, findOrCreateEvent } from '$lib/server/airtable.js';
+import { createParty, createAdults, createVisit, findTodaysEvent } from '$lib/server/airtable.js';
 import { sendCheckInConfirmation } from '$lib/server/email.js';
 import { todaysEvent } from '$lib/utils/event.js';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export async function load() {
+	const { visitDate } = todaysEvent();
+	const event = await findTodaysEvent(visitDate);
+	return { checkInOpen: Boolean(event) };
+}
 
 export const actions = {
 	submit: async ({ request }) => {
@@ -38,6 +44,14 @@ export const actions = {
 			return fail(400, { error: 'Children today must be zero or more.' });
 		}
 
+		const { eventName, visitDate } = todaysEvent();
+		// Re-checked here, not just in the UI: check-in only opens once a
+		// volunteer has logged in and created today's Event — see /volunteer.
+		const event = await findTodaysEvent(visitDate);
+		if (!event) {
+			return fail(423, { error: 'Check-in is locked — no dance is scheduled today.' });
+		}
+
 		const party = await createParty({
 			leadAdultName,
 			adultsCount,
@@ -57,15 +71,13 @@ export const actions = {
 			.filter((a) => a.name);
 		await createAdults(party.id, additionalAdults);
 
-		const { eventName, visitDate } = todaysEvent();
-		const eventId = await findOrCreateEvent(eventName, visitDate);
 		await createVisit(party.id, {
 			eventName,
 			visitDate,
 			adultsThisVisit,
 			childrenThisVisit,
 			notes: str('notes'),
-			eventId
+			eventId: event.id
 		});
 
 		await sendCheckInConfirmation({ to: party.primaryEmail, leadAdultName: party.leadAdultName });
