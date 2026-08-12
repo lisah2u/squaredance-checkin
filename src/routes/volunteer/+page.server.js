@@ -1,5 +1,5 @@
 import { fail } from '@sveltejs/kit';
-import { getPartyDetails, createVisit } from '$lib/server/airtable.js';
+import { getPartyDetails, createVisit, findOrCreateEvent } from '$lib/server/airtable.js';
 import { todaysEvent } from '$lib/utils/event.js';
 
 export const actions = {
@@ -19,14 +19,18 @@ export const actions = {
 		}
 
 		const { eventName, visitDate } = todaysEvent();
-		const party = await getPartyDetails(partyId);
+		const [party, eventId] = await Promise.all([
+			getPartyDetails(partyId),
+			findOrCreateEvent(eventName, visitDate)
+		]);
 
 		await createVisit(partyId, {
 			eventName,
 			visitDate,
 			adultsThisVisit,
 			childrenThisVisit,
-			notes
+			notes,
+			eventId
 		});
 
 		return { success: true, leadAdultName: party.leadAdultName };

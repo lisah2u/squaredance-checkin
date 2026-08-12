@@ -1,7 +1,9 @@
 import { fail } from '@sveltejs/kit';
-import { createParty, createAdults, createVisit } from '$lib/server/airtable.js';
+import { createParty, createAdults, createVisit, findOrCreateEvent } from '$lib/server/airtable.js';
 import { sendCheckInConfirmation } from '$lib/server/email.js';
 import { todaysEvent } from '$lib/utils/event.js';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const actions = {
 	submit: async ({ request }) => {
@@ -18,9 +20,11 @@ export const actions = {
 		const childrenCount = num('childrenCount');
 		const adultsThisVisit = num('adultsThisVisit');
 		const childrenThisVisit = num('childrenThisVisit');
+		const primaryEmail = str('primaryEmail');
 
 		if (!leadAdultName) return fail(400, { error: 'Lead adult name is required.' });
 		if (!city || !state) return fail(400, { error: 'City and state are required.' });
+		if (!EMAIL_PATTERN.test(primaryEmail)) return fail(400, { error: 'A valid email is required.' });
 		if (!Number.isFinite(adultsCount) || adultsCount < 1) {
 			return fail(400, { error: 'At least one adult is required.' });
 		}
@@ -40,7 +44,7 @@ export const actions = {
 			childrenCount,
 			city,
 			state,
-			primaryEmail: str('primaryEmail'),
+			primaryEmail,
 			additionalEmails: str('additionalEmails'),
 			howDidYouHear: str('howDidYouHear'),
 			disability: data.get('disability') === 'on',
@@ -54,17 +58,17 @@ export const actions = {
 		await createAdults(party.id, additionalAdults);
 
 		const { eventName, visitDate } = todaysEvent();
+		const eventId = await findOrCreateEvent(eventName, visitDate);
 		await createVisit(party.id, {
 			eventName,
 			visitDate,
 			adultsThisVisit,
 			childrenThisVisit,
-			notes: str('notes')
+			notes: str('notes'),
+			eventId
 		});
 
-		if (party.primaryEmail) {
-			await sendCheckInConfirmation({ to: party.primaryEmail, leadAdultName: party.leadAdultName });
-		}
+		await sendCheckInConfirmation({ to: party.primaryEmail, leadAdultName: party.leadAdultName });
 
 		return { success: true, leadAdultName: party.leadAdultName };
 	}

@@ -30,6 +30,8 @@
 	let visitChildren = $state(0);
 	let visitNotes = $state('');
 
+	const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 	function goToAdults() {
 		stepError = '';
 		if (!leadAdultName.trim()) {
@@ -46,6 +48,10 @@
 		}
 		if (!Number.isFinite(childrenCount) || childrenCount < 0) {
 			stepError = 'Children count must be zero or more.';
+			return;
+		}
+		if (!primaryEmail.trim() || !EMAIL_PATTERN.test(primaryEmail.trim())) {
+			stepError = 'Please enter a valid email address.';
 			return;
 		}
 		step = 'adults';
@@ -163,12 +169,16 @@
 				</div>
 
 				<label class="block">
-					<span class="text-sm font-medium text-slate-700">Email (optional)</span>
+					<span class="text-sm font-medium text-slate-700">Email</span>
 					<input
 						type="email"
 						bind:value={primaryEmail}
+						required
 						class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
 					/>
+					<span class="mt-1 block text-xs text-slate-500">
+						We'll add you to our mailing list so you hear about future dances. We never share your email with anyone else.
+					</span>
 				</label>
 
 				<label class="block">

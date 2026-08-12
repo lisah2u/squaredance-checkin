@@ -44,7 +44,13 @@ export const VISIT_FIELDS = {
 	adultsThisVisit: 'Adults This Visit',
 	childrenThisVisit: 'Children This Visit',
 	checkInMethod: 'Check-in Method',
-	notes: 'Notes'
+	notes: 'Notes',
+	events: 'Events'
+};
+
+export const EVENT_FIELDS = {
+	eventName: 'Event Name',
+	eventDate: 'Event Date'
 };
 
 // Valid options for VISIT_FIELDS.checkInMethod (Airtable single select).

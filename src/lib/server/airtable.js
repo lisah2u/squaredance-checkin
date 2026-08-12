@@ -1,6 +1,6 @@
 import Airtable from 'airtable';
 import { env } from '$env/dynamic/private';
-import { TABLES, PARTY_FIELDS, ADULT_FIELDS, VISIT_FIELDS, CHECK_IN_METHODS } from './schema.js';
+import { TABLES, PARTY_FIELDS, ADULT_FIELDS, VISIT_FIELDS, EVENT_FIELDS, CHECK_IN_METHODS } from './schema.js';
 
 /**
  * @typedef {object} Party
@@ -44,6 +44,7 @@ import { TABLES, PARTY_FIELDS, ADULT_FIELDS, VISIT_FIELDS, CHECK_IN_METHODS } fr
  * @property {number} childrenThisVisit
  * @property {string} [checkInMethod]
  * @property {string} [notes]
+ * @property {string} [eventId]
  */
 
 function getBase() {
@@ -155,7 +156,31 @@ export async function createAdults(partyId, adults) {
 }
 
 /**
- * Create a Visit record linked to a party.
+ * Find the Event for a given date, or create one if it doesn't exist yet.
+ * Lets Visits link to a real Events record (not just a free-text Event Name)
+ * so the Events table's rollups (Total Adults/Children/Parties) work.
+ * @param {string} eventName
+ * @param {string} eventDate - YYYY-MM-DD
+ * @returns {Promise<string>} eventId
+ */
+export async function findOrCreateEvent(eventName, eventDate) {
+	const existing = await getBase()(TABLES.events)
+		.select({
+			filterByFormula: `IS_SAME({${EVENT_FIELDS.eventDate}}, "${eventDate}", 'day')`,
+			maxRecords: 1
+		})
+		.all();
+	if (existing.length > 0) return existing[0].id;
+
+	const record = await getBase()(TABLES.events).create({
+		[EVENT_FIELDS.eventName]: eventName,
+		[EVENT_FIELDS.eventDate]: eventDate
+	});
+	return record.id;
+}
+
+/**
+ * Create a Visit record linked to a party (and, if visit.eventId is given, to an Event).
  * @param {string} partyId
  * @param {NewVisitInput} visit
  */
@@ -167,7 +192,8 @@ export async function createVisit(partyId, visit) {
 		[VISIT_FIELDS.adultsThisVisit]: visit.adultsThisVisit,
 		[VISIT_FIELDS.childrenThisVisit]: visit.childrenThisVisit,
 		[VISIT_FIELDS.checkInMethod]: visit.checkInMethod || CHECK_IN_METHODS.door,
-		[VISIT_FIELDS.notes]: visit.notes || undefined
+		[VISIT_FIELDS.notes]: visit.notes || undefined,
+		[VISIT_FIELDS.events]: visit.eventId ? [visit.eventId] : undefined
 	});
 	return { id: record.id, eventName: record.get(VISIT_FIELDS.eventName) };
 }
