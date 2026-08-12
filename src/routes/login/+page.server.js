@@ -1,5 +1,12 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { checkVolunteerPassword, createSessionToken, SESSION_COOKIE } from '$lib/server/auth.js';
+import {
+	checkVolunteerPassword,
+	createSessionToken,
+	SESSION_COOKIE,
+	isLoginRateLimited,
+	recordFailedLogin,
+	clearLoginAttempts
+} from '$lib/server/auth.js';
 
 // Only allow redirecting back to an in-app path — an unvalidated redirectTo
 // query param would otherwise be an open-redirect vector.
@@ -10,14 +17,22 @@ function safeRedirectTarget(raw) {
 }
 
 export const actions = {
-	default: async ({ request, cookies, url }) => {
+	default: async ({ request, cookies, url, getClientAddress }) => {
+		const ip = getClientAddress();
+
+		if (isLoginRateLimited(ip)) {
+			return fail(429, { error: 'Too many attempts. Wait a few minutes and try again.' });
+		}
+
 		const data = await request.formData();
 		const password = data.get('password')?.toString() ?? '';
 
 		if (!checkVolunteerPassword(password)) {
+			recordFailedLogin(ip);
 			return fail(401, { error: 'Incorrect password.' });
 		}
 
+		clearLoginAttempts(ip);
 		cookies.set(SESSION_COOKIE, createSessionToken(), {
 			path: '/',
 			httpOnly: true,
