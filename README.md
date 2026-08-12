@@ -49,12 +49,14 @@ npm run preview       # preview the production build locally
 
 Two independent gates:
 
-1. **Login** — a single shared password (`VOLUNTEER_PASSWORD`) gates `/volunteer` and the `/api/parties/search` endpoint at the request level, in `src/hooks.server.js`. Session is a signed, httpOnly cookie (`src/lib/server/auth.js`), valid 12 hours. No per-volunteer accounts, no login-attempt lockout — pick a long, random password and treat it like the Airtable token. `/new-party` is not behind login (see below).
+1. **Login** — a single shared password (`VOLUNTEER_PASSWORD`) gates `/volunteer` and the `/api/parties/search` endpoint at the request level, in `src/hooks.server.js`. Session is a signed, httpOnly cookie (`src/lib/server/auth.js`), valid 12 hours. No per-volunteer accounts — pick a long, random password and treat it like the Airtable token. `/new-party` is not behind login (see below). Login attempts are rate-limited (5 failures per IP per 5 minutes, in-memory in `auth.js`) — a speed bump against brute-forcing the shared password, not a hard guarantee, since it resets on a cold serverless start and isn't shared across concurrent function instances.
 2. **Check-in lock** — *both* `/volunteer`'s `checkIn` action and `/new-party`'s `submit` action only succeed if today's Event record already exists in Airtable (checked server-side, not just hidden in the UI — see `findTodaysEvent` in `src/lib/server/airtable.js`). Dances aren't on a fixed schedule, so there's no calendar rule to compute this from, and **nothing creates today's Event except a logged-in volunteer**:
    - **Unlock**: a volunteer logs in at `/volunteer` and clicks "Open check-in for today's dance" (the `openToday` action — the only code path that calls `findOrCreateEvent`). A dance day's Event can also be added by hand in Airtable ahead of time, which has the same effect.
    - **Lock**: nothing to do — tomorrow the date no longer matches, so both routes are closed again automatically.
 
 This closes a real gap from an earlier version: `/new-party` used to auto-create today's Event on submit, which meant anyone who found the anonymous URL could silently open check-in for the day just by self-registering — even with no volunteer present and no dance actually happening. Now `/new-party` can only ever *read* whether an Event exists; only the authenticated `openToday` action can create one.
+
+The lock (and every "today" the app writes to Airtable) is computed in `America/New_York`, not the server's own clock (`src/lib/utils/event.js`) — Netlify Functions run in UTC, which would otherwise roll "today" over to the next date at 8pm Eastern, mid-dance for a typical 7–10pm night, and silently re-lock check-in on anyone submitting after that point.
 
 ## Security & data handling
 
@@ -63,16 +65,21 @@ This closes a real gap from an earlier version: `/new-party` used to auto-create
 - Email is **required** on `/new-party` — it's used to add the party to the CMDF mailing list and isn't shared with anyone else. The form says so.
 - All Airtable writes happen server-side (`src/lib/server/`); the API token is never exposed to the browser.
 - `/volunteer` and `/api/parties/search` (which returns party names, cities, emails) require login. `/new-party` doesn't require login, but is still locked to dance days — see above.
+- **Content-Security-Policy** — set per-request by SvelteKit (`csp` in `vite.config.js`), with auto-generated nonces for its own inline scripts. `default-src 'self'`; no external scripts, fonts, or CDNs are loaded anywhere in the app.
+- **Other security headers** — `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`, `Permissions-Policy`, set Netlify-side in `netlify.toml` (CSP is deliberately not duplicated there, since it needs the per-response nonce).
+- **`/login` is rate-limited** — see above.
+- **Airtable formula injection** — `searchParties` builds an Airtable `filterByFormula` string from the user's search query. The query is escaped (backslashes first, then quotes — that order matters, since escaping quotes first would let a raw `\"` in the input combine with the added `\` into `\\"`, which closes the string literal early and lets attacker-supplied formula syntax run, e.g. an always-true clause that dumps every party instead of just matches).
+- `npm audit` — 0 vulnerabilities. `cookie` (a transitive dep of `@sveltejs/kit`) is pinned to `^0.7.2` via `overrides` in `package.json`, ahead of what `@sveltejs/kit@2.70.2` itself specifies, to pick up a fix for [GHSA-pxg6-pf52-xh8x](https://github.com/advisories/GHSA-pxg6-pf52-xh8x) (out-of-bounds characters in cookie name/path/domain) — re-check whether this override is still needed next time `@sveltejs/kit` is upgraded.
 
 ## Status
 
-MVP flows (search, confirm, record visit, new-party self-service, Events auto-linking, volunteer login + check-in lock on both routes) are built and tested against live data. Not yet done:
+MVP flows (search, confirm, record visit, new-party self-service, Events auto-linking, volunteer login + check-in lock on both routes) are built and tested against live data, plus a first security pass (headers, CSP, dependency audit, login rate-limiting, formula-injection fix, timezone fix). Not yet done:
 
 - Deploy to Netlify and attach a subdomain (e.g. `checkin.cacaponmusicanddance.org`) off CMDF's existing Netlify-hosted domain, `cacaponmusicanddance.org`.
 - Set `VOLUNTEER_PASSWORD` and `SESSION_SECRET` (a fresh value, not the local-dev one) in Netlify's site environment variables.
 - QR code for `/new-party` (deferred to an external generator, not an in-app dependency).
 - Real email sending (swap the stub in `src/lib/server/email.js` for SendGrid once there's a key).
 - Error handling / edge-case polish (retry on network failure, duplicate-submission guarding).
-- Broader security pass (headers, dependency audit, rate limiting on `/login`) still to do.
+- Login rate limiting is in-memory only — fine for a shared low-value password on a small volunteer app, but wouldn't hold up against a distributed attempt. A durable store (e.g. Airtable or a small KV) would be the next step up if that ever seems warranted.
 
 Full design doc and session-by-session build log: `~/code/dev-vault/dev-vault/00_Inbox/in-progress/Square Dance Check-in with mailchimp integration.md`.
