@@ -180,6 +180,24 @@ export async function findOrCreateEvent(eventName, eventDate) {
 }
 
 /**
+ * Look up (but do not create) the Event for a given date. Used to gate
+ * volunteer check-in on a dance actually being scheduled — see
+ * src/lib/server/auth.js and the volunteer route for the login/lock design.
+ * @param {string} eventDate - YYYY-MM-DD
+ * @returns {Promise<{id: string, eventName: string} | null>}
+ */
+export async function findTodaysEvent(eventDate) {
+	const existing = await getBase()(TABLES.events)
+		.select({
+			filterByFormula: `IS_SAME({${EVENT_FIELDS.eventDate}}, "${eventDate}", 'day')`,
+			maxRecords: 1
+		})
+		.all();
+	if (existing.length === 0) return null;
+	return { id: existing[0].id, eventName: String(existing[0].get(EVENT_FIELDS.eventName) ?? '') };
+}
+
+/**
  * Create a Visit record linked to a party (and, if visit.eventId is given, to an Event).
  * @param {string} partyId
  * @param {NewVisitInput} visit

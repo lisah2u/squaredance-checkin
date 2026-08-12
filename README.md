@@ -1,11 +1,11 @@
 # Square Dance Check-In
 
-Check-in app for CMDF square dances, built on SvelteKit + Airtable. Two routes, no login:
+Check-in app for CMDF square dances, built on SvelteKit + Airtable. Two routes:
 
-- **`/volunteer`** — a volunteer searches for a returning party, confirms details, records today's visit.
-- **`/new-party`** — a first-time visitor fills out their own info (self-service, e.g. via a QR code at the door), creating a Party + optional additional Adults + a Visit record.
+- **`/volunteer`** — a volunteer searches for a returning party, confirms details, records today's visit. Requires login (shared password) and only works once today's Event record exists in Airtable — see [Login & check-in lock](#login--check-in-lock).
+- **`/new-party`** — a first-time visitor fills out their own info (self-service, e.g. via a QR code at the door), creating a Party + optional additional Adults + a Visit record. **Stays anonymous, no login, always open** — this is intentional so newcomers can self-register any time, including ahead of a dance.
 
-Every check-in also finds-or-creates today's Event record and links the Visit to it, so the Events table's rollups (Total Adults/Children/Parties) stay accurate without any manual step.
+`/new-party` check-ins find-or-create today's Event record and link the Visit to it. `/volunteer` check-ins only ever link to an Event that already exists (see below) — so the Events table's rollups (Total Adults/Children/Parties) stay accurate either way, without any manual step for `/new-party`.
 
 ## Setup
 
@@ -19,9 +19,11 @@ Fill in `.env`:
 ```
 AIRTABLE_API_KEY=<a Personal Access Token scoped to the CMDF Square Dances base>
 AIRTABLE_BASE_ID=appHYcz1rdao0Evm6
+VOLUNTEER_PASSWORD=<a long, random shared password — told to volunteers verbally, not emailed>
+SESSION_SECRET=<random hex, e.g. `openssl rand -hex 32` — use a different value in Netlify than local dev>
 ```
 
-The token needs `data.records:read`, `data.records:write`, and `schema.bases:read` on that base.
+The Airtable token needs `data.records:read`, `data.records:write`, and `schema.bases:read` on that base.
 
 ## Running
 
@@ -35,25 +37,41 @@ npm run preview       # preview the production build locally
 ## Architecture
 
 - `src/lib/server/schema.js` — table/field name constants. **Field names, not IDs** — mirrors the live Airtable schema exactly. If a field gets renamed in Airtable, re-check with `list_tables_for_base` before assuming this file is still accurate; it has drifted from the original plan doc before (see field-name deviations noted in the plan's Build Progress Log).
-- `src/lib/server/airtable.js` — the only place that talks to Airtable. `searchParties`, `getPartyDetails`, `createParty`, `createAdults`, `createVisit`, `findOrCreateEvent`.
+- `src/lib/server/airtable.js` — the only place that talks to Airtable. `searchParties`, `getPartyDetails`, `createParty`, `createAdults`, `createVisit`, `findOrCreateEvent` (used by `/new-party` only), `findTodaysEvent` (read-only lookup, used by `/volunteer` to gate check-in).
+- `src/lib/server/auth.js` — shared-password check and signed session-cookie helpers for the `/volunteer` login.
+- `src/hooks.server.js` — gates `/volunteer` and `/api/parties/search` behind a valid session cookie; everything else (including `/new-party`) is public.
 - `src/lib/server/email.js` — check-in confirmation email. Currently a **stub** (logs to console, doesn't send) pending a SendGrid key.
 - `src/routes/volunteer/`, `src/routes/new-party/` — one SvelteKit form action per flow (`+page.server.js`), UI in `+page.svelte`. Both use `$app/forms`'s `use:enhance` for progressive enhancement.
+- `src/routes/login/`, `src/routes/logout/` — the shared-password login form and a logout endpoint that clears the session cookie.
 - `src/lib/components/VisitFields.svelte` — the adults/children/notes inputs shared by both flows.
+
+## Login & check-in lock
+
+`/volunteer` is protected two ways, independently:
+
+1. **Login** — a single shared password (`VOLUNTEER_PASSWORD`) gates the page and the `/api/parties/search` endpoint at the request level, in `src/hooks.server.js`. Session is a signed, httpOnly cookie (`src/lib/server/auth.js`), valid 12 hours. No per-volunteer accounts, no login-attempt lockout — pick a long, random password and treat it like the Airtable token.
+2. **Check-in lock** — even when logged in, the check-in *action* only succeeds if today's Event record already exists in Airtable (checked server-side in the `checkIn` form action, not just hidden in the UI). Dances aren't on a fixed schedule, so there's no calendar rule to compute this from:
+   - **Unlock**: add today's Event row in Airtable (`Event Name` + `Event Date`) before the dance.
+   - **Lock**: nothing to do — tomorrow the date no longer matches, so it's closed again automatically.
+   - `/new-party` is intentionally exempt from this lock (it still auto-creates today's Event if needed) so newcomers can self-register anytime.
 
 ## Security & data handling
 
-- `.env` (real Airtable token) is git-ignored. Never commit it. `.env.example` is the template.
+- `.env` (Airtable token, volunteer password, session secret) is git-ignored. Never commit it. `.env.example` is the template.
 - `*.csv` is git-ignored — the historical registration CSV in this repo contains real attendee PII (name, email, ethnicity, gender, disability/veteran status) and is already imported into Airtable; the app doesn't need it.
 - Email is **required** on `/new-party` — it's used to add the party to the CMDF mailing list and isn't shared with anyone else. The form says so.
 - All Airtable writes happen server-side (`src/lib/server/`); the API token is never exposed to the browser.
+- `/volunteer` and `/api/parties/search` (which returns party names, cities, emails) require login — see above. `/new-party` stays anonymous by design.
 
 ## Status
 
-MVP flows (search, confirm, record visit, new-party self-service, Events auto-linking) are built and tested against live data. Not yet done:
+MVP flows (search, confirm, record visit, new-party self-service, Events auto-linking, volunteer login + check-in lock) are built and tested against live data. Not yet done:
 
 - Deploy to Netlify and attach a subdomain (e.g. `checkin.cacaponmusicanddance.org`) off CMDF's existing Netlify-hosted domain, `cacaponmusicanddance.org`.
+- Set `VOLUNTEER_PASSWORD` and `SESSION_SECRET` (a fresh value, not the local-dev one) in Netlify's site environment variables.
 - QR code for `/new-party` (deferred to an external generator, not an in-app dependency).
 - Real email sending (swap the stub in `src/lib/server/email.js` for SendGrid once there's a key).
 - Error handling / edge-case polish (retry on network failure, duplicate-submission guarding).
+- Broader security pass (headers, dependency audit, rate limiting on `/login`) still to do.
 
 Full design doc and session-by-session build log: `~/code/dev-vault/dev-vault/00_Inbox/in-progress/Square Dance Check-in with mailchimp integration.md`.

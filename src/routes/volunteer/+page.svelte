@@ -3,6 +3,8 @@
 	import { resolve } from '$app/paths';
 	import VisitFields from '$lib/components/VisitFields.svelte';
 
+	let { data } = $props();
+
 	/** @type {'search' | 'confirm' | 'success'} */
 	let step = $state('search');
 	let query = $state('');
@@ -65,9 +67,21 @@
 	}
 </script>
 
-<h1 class="text-xl font-semibold">Volunteer Check-In</h1>
+<div class="flex items-center justify-between">
+	<h1 class="text-xl font-semibold">Volunteer Check-In</h1>
+	<form method="POST" action="/logout">
+		<button type="submit" class="text-sm text-slate-500 hover:underline">Log out</button>
+	</form>
+</div>
 
-{#if step === 'search'}
+{#if !data.checkInOpen}
+	<div class="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
+		<p class="font-medium">Check-in is locked</p>
+		<p class="mt-1 text-sm text-slate-600">
+			No dance is scheduled for today in Airtable yet. Add today's Event record to unlock check-in.
+		</p>
+	</div>
+{:else if step === 'search'}
 	<p class="mt-2 text-sm text-slate-500">Search by name, city, or email.</p>
 
 	<input
