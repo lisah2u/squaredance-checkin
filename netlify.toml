@@ -9,3 +9,15 @@
   # secrets scanner otherwise flags it as a false-positive leak because
   # the same value also appears in source/docs.
   SECRETS_SCAN_OMIT_KEYS = "AIRTABLE_BASE_ID"
+
+# Content-Security-Policy is set dynamically per-request by SvelteKit (see
+# csp config in vite.config.js) so it can include per-response nonces —
+# it isn't duplicated here. These are the headers that don't need that.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Permissions-Policy = "geolocation=(), camera=(), microphone=(), payment=(), usb=()"
