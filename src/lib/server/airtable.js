@@ -93,7 +93,11 @@ export async function searchParties(query) {
 	if (!trimmed || trimmed.length < 2) return [];
 
 	// Airtable formulas have no case-insensitive "contains"; LOWER() both sides.
-	const escaped = trimmed.toLowerCase().replace(/"/g, '\\"');
+	// Backslashes must be escaped before quotes — a raw `\"` in the query would
+	// otherwise combine with the quote-escaping below into `\\"`, which closes
+	// the string literal early and lets the rest of the input run as formula
+	// syntax (e.g. an always-true clause that dumps every party, not just matches).
+	const escaped = trimmed.toLowerCase().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 	const filterByFormula = `FIND("${escaped}", LOWER({${PARTY_FIELDS.searchKey}})) > 0`;
 
 	const records = await getBase()(TABLES.parties)
