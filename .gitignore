@@ -24,3 +24,7 @@ vite.config.ts.timestamp-*
 
 # Attendee PII — already imported into Airtable, not needed by app code
 *.csv
+
+# Documentation
+*.key
+*.pdf
