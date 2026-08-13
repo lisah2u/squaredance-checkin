@@ -1,5 +1,6 @@
 <script>
 	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
 
 	let { data, form } = $props();
 
@@ -21,6 +22,9 @@
 	<div class="mt-6 rounded-lg border border-green-200 bg-green-50 p-6 text-center">
 		<p class="font-medium">Today's event is open</p>
 		<p class="mt-1 text-sm text-slate-600">"{createdEventName}" — visitors can now check in at the door.</p>
+	</div>
+	<div class="mt-4 text-center">
+		<a href={resolve('/')} class="text-sm text-slate-500 hover:underline">&larr; Back to start</a>
 	</div>
 {:else}
 	<p class="mt-2 text-sm text-slate-500">Create today's event to open check-in for visitors.</p>

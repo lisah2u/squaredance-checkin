@@ -1,5 +1,6 @@
 import { fail } from '@sveltejs/kit';
-import { getPartyDetails, createVisit, findTodaysEvent } from '$lib/server/airtable.js';
+import { getPartyDetails, recordVisit, findTodaysEvent } from '$lib/server/airtable.js';
+import { syncToMailchimp } from '$lib/server/mailchimp.js';
 import { todaysEvent } from '$lib/utils/event.js';
 import { ATTENDING_OPTIONS } from '$lib/attending.js';
 
@@ -37,7 +38,7 @@ export const actions = {
 			return fail(423, { error: 'Check-in is locked — please see staff at the door.' });
 		}
 
-		await createVisit(partyId, {
+		const visit = await recordVisit(partyId, {
 			eventName,
 			visitDate,
 			adultsThisVisit,
@@ -47,6 +48,8 @@ export const actions = {
 			eventId: event.id
 		});
 
-		return { success: true, leadAdultName: party.leadAdultName };
+		await syncToMailchimp(party.primaryEmail);
+
+		return { success: true, leadAdultName: party.leadAdultName, updated: visit.updated };
 	}
 };

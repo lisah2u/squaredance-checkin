@@ -1,6 +1,6 @@
 import { fail } from '@sveltejs/kit';
-import { createParty, createAdults, createVisit, findTodaysEvent } from '$lib/server/airtable.js';
-import { sendCheckInConfirmation } from '$lib/server/email.js';
+import { createParty, createAdults, recordVisit, findTodaysEvent } from '$lib/server/airtable.js';
+import { syncToMailchimp } from '$lib/server/mailchimp.js';
 import { todaysEvent } from '$lib/utils/event.js';
 import { ATTENDING_OPTIONS } from '$lib/attending.js';
 
@@ -74,7 +74,7 @@ export const actions = {
 			.filter((a) => a.name);
 		await createAdults(party.id, additionalAdults);
 
-		await createVisit(party.id, {
+		await recordVisit(party.id, {
 			eventName,
 			visitDate,
 			adultsThisVisit,
@@ -84,7 +84,7 @@ export const actions = {
 			eventId: event.id
 		});
 
-		await sendCheckInConfirmation({ to: party.primaryEmail, leadAdultName: party.leadAdultName });
+		await syncToMailchimp(party.primaryEmail);
 
 		return { success: true, leadAdultName: party.leadAdultName };
 	}

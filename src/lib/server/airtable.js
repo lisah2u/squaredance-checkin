@@ -226,12 +226,38 @@ export async function findTodaysEvent(eventDate) {
 }
 
 /**
- * Create a Visit record linked to a party (and, if visit.eventId is given, to an Event).
+ * Find an existing Visit for this party on the given date, if any. Used so a
+ * party checking in twice the same day (e.g. via /new-party, then found and
+ * checked in again via /returning-party) updates that Visit instead of
+ * creating a second row for the same night.
+ * @param {string} partyId
+ * @param {string} visitDate - YYYY-MM-DD
+ * @returns {Promise<{id: string} | null>}
+ */
+async function findTodaysVisitForParty(partyId, visitDate) {
+	// partyId can come from user-submitted form data (returning-party's hidden
+	// field) and is interpolated into the formula below, so validate its shape
+	// first — same reasoning as the escaping in searchParties.
+	if (!/^rec[A-Za-z0-9]{14}$/.test(partyId)) return null;
+
+	const records = await getBase()(TABLES.visits)
+		.select({
+			filterByFormula: `AND(FIND("${partyId}", ARRAYJOIN({${VISIT_FIELDS.linkedParty}})) > 0, IS_SAME({${VISIT_FIELDS.visitDate}}, "${visitDate}", 'day'))`,
+			maxRecords: 1
+		})
+		.all();
+	return records.length ? { id: records[0].id } : null;
+}
+
+/**
+ * Record a party's visit for the day: creates a Visit, or updates the one
+ * that already exists for this party today (see findTodaysVisitForParty)
+ * rather than creating a duplicate.
  * @param {string} partyId
  * @param {NewVisitInput} visit
  */
-export async function createVisit(partyId, visit) {
-	const record = await getBase()(TABLES.visits).create({
+export async function recordVisit(partyId, visit) {
+	const fields = {
 		[VISIT_FIELDS.linkedParty]: [partyId],
 		[VISIT_FIELDS.eventName]: visit.eventName,
 		[VISIT_FIELDS.visitDate]: visit.visitDate,
@@ -241,6 +267,12 @@ export async function createVisit(partyId, visit) {
 		[VISIT_FIELDS.notes]: visit.notes || undefined,
 		[VISIT_FIELDS.events]: visit.eventId ? [visit.eventId] : undefined,
 		[VISIT_FIELDS.attending]: visit.attending?.length ? visit.attending : undefined
-	});
-	return { id: record.id, eventName: record.get(VISIT_FIELDS.eventName) };
+	};
+
+	const existing = await findTodaysVisitForParty(partyId, visit.visitDate);
+	const record = existing
+		? await getBase()(TABLES.visits).update(existing.id, fields)
+		: await getBase()(TABLES.visits).create(fields);
+
+	return { id: record.id, eventName: record.get(VISIT_FIELDS.eventName), updated: Boolean(existing) };
 }

@@ -21,6 +21,7 @@
 	let submitting = $state(false);
 	let errorMessage = $state('');
 	let successName = $state('');
+	let visitUpdated = $state(false);
 
 	/** @type {ReturnType<typeof setTimeout> | undefined} */
 	let debounceTimer;
@@ -137,6 +138,7 @@
 				if (result.type === 'success') {
 					const data = /** @type {any} */ (result.data);
 					successName = data?.leadAdultName ?? selectedParty?.leadAdultName ?? '';
+					visitUpdated = Boolean(data?.updated);
 					step = 'success';
 				} else if (result.type === 'failure') {
 					const data = /** @type {any} */ (result.data);
@@ -169,8 +171,11 @@
 	</form>
 {:else if step === 'success'}
 	<div class="mt-6 rounded-lg border border-green-200 bg-green-50 p-6 text-center">
-		<p class="text-lg font-medium">Check-in complete!</p>
-		<p class="mt-1 text-sm text-slate-600">{successName} is recorded for today.</p>
+		<p class="text-lg font-medium">{visitUpdated ? "Visit updated!" : 'Check-in complete!'}</p>
+		<p class="mt-1 text-sm text-slate-600">
+			{successName}
+			{visitUpdated ? 'was already checked in today — updated with today\'s latest details.' : 'is recorded for today.'}
+		</p>
 		<button
 			type="button"
 			onclick={checkInAnother}
@@ -178,5 +183,8 @@
 		>
 			Check in another party
 		</button>
+	</div>
+	<div class="mt-4 text-center">
+		<a href={resolve('/')} class="text-sm text-slate-500 hover:underline">&larr; Back to start</a>
 	</div>
 {/if}

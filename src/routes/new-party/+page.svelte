@@ -1,5 +1,6 @@
 <script>
 	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
 	import VisitFields from '$lib/components/VisitFields.svelte';
 
 	let { data } = $props();
@@ -316,6 +317,9 @@
 	<div class="mt-6 rounded-lg border border-green-200 bg-green-50 p-6 text-center">
 		<p class="text-lg font-medium">Party created & checked in!</p>
 		<p class="mt-1 text-sm text-slate-600">Welcome, {successName}. Enjoy the dance!</p>
+	</div>
+	<div class="mt-4 text-center">
+		<a href={resolve('/')} class="text-sm text-slate-500 hover:underline">&larr; Back to start</a>
 	</div>
 {/if}
 {/if}
