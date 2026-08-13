@@ -13,7 +13,7 @@ import {
 /** @param {string | null} raw */
 function safeRedirectTarget(raw) {
 	if (raw && raw.startsWith('/') && !raw.startsWith('//')) return raw;
-	return '/volunteer';
+	return '/staff';
 }
 
 export const actions = {

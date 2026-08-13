@@ -45,6 +45,18 @@ import { TABLES, PARTY_FIELDS, ADULT_FIELDS, VISIT_FIELDS, EVENT_FIELDS, CHECK_I
  * @property {string} [checkInMethod]
  * @property {string} [notes]
  * @property {string} [eventId]
+ * @property {string[]} [attending]
+ */
+
+/**
+ * @typedef {object} PublicParty
+ * @property {string} id
+ * @property {string} leadAdultName
+ * @property {string} additionalAdultNames
+ * @property {string} city
+ * @property {string} state
+ * @property {number} adultsCount
+ * @property {number} childrenCount
  */
 
 function getBase() {
@@ -85,8 +97,12 @@ function partyFromRecord(record) {
  * Search Parties by the Party Search Key (name / city / state / email all
  * live in that one formula field). Returns [] for an empty/short query so
  * callers don't accidentally dump all 189 parties into a dropdown.
+ *
+ * This search is reachable by anonymous door visitors (self-service
+ * returning-party check-in), so results are trimmed to what's needed to
+ * pick the right party and pre-fill a visit — no email, no visit history.
  * @param {string | null} query
- * @returns {Promise<Party[]>}
+ * @returns {Promise<PublicParty[]>}
  */
 export async function searchParties(query) {
 	const trimmed = query?.trim();
@@ -104,7 +120,15 @@ export async function searchParties(query) {
 		.select({ filterByFormula, maxRecords: 20, sort: [{ field: PARTY_FIELDS.lastSeen, direction: 'desc' }] })
 		.all();
 
-	return records.map(partyFromRecord);
+	return records.map(partyFromRecord).map((party) => ({
+		id: party.id,
+		leadAdultName: party.leadAdultName,
+		additionalAdultNames: party.additionalAdultNames,
+		city: party.city,
+		state: party.state,
+		adultsCount: party.adultsCount,
+		childrenCount: party.childrenCount
+	}));
 }
 
 /**
@@ -185,8 +209,8 @@ export async function findOrCreateEvent(eventName, eventDate) {
 
 /**
  * Look up (but do not create) the Event for a given date. Used to gate
- * volunteer check-in on a dance actually being scheduled — see
- * src/lib/server/auth.js and the volunteer route for the login/lock design.
+ * check-in on a dance actually being scheduled — see src/lib/server/auth.js
+ * and the /staff route for the login/lock design.
  * @param {string} eventDate - YYYY-MM-DD
  * @returns {Promise<{id: string, eventName: string} | null>}
  */
@@ -215,7 +239,8 @@ export async function createVisit(partyId, visit) {
 		[VISIT_FIELDS.childrenThisVisit]: visit.childrenThisVisit,
 		[VISIT_FIELDS.checkInMethod]: visit.checkInMethod || CHECK_IN_METHODS.door,
 		[VISIT_FIELDS.notes]: visit.notes || undefined,
-		[VISIT_FIELDS.events]: visit.eventId ? [visit.eventId] : undefined
+		[VISIT_FIELDS.events]: visit.eventId ? [visit.eventId] : undefined,
+		[VISIT_FIELDS.attending]: visit.attending?.length ? visit.attending : undefined
 	});
 	return { id: record.id, eventName: record.get(VISIT_FIELDS.eventName) };
 }

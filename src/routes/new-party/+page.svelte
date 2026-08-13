@@ -31,6 +31,8 @@
 	let visitAdults = $state(1);
 	let visitChildren = $state(0);
 	let visitNotes = $state('');
+	/** @type {string[]} */
+	let visitAttending = $state([]);
 
 	const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -78,7 +80,7 @@
 {#if !data.checkInOpen}
 	<div class="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
 		<p class="font-medium">Check-in isn't open right now</p>
-		<p class="mt-1 text-sm text-slate-600">Please see a volunteer at the door.</p>
+		<p class="mt-1 text-sm text-slate-600">Please see staff at the door.</p>
 	</div>
 {:else}
 <p class="mt-2 text-sm text-slate-500">Tell us a bit about your party.</p>
@@ -109,6 +111,8 @@
 			formData.set('adultsThisVisit', String(visitAdults));
 			formData.set('childrenThisVisit', String(visitChildren));
 			formData.set('notes', visitNotes);
+			formData.delete('attending');
+			visitAttending.forEach((choice) => formData.append('attending', choice));
 
 			return async ({ result }) => {
 				submitting = false;
@@ -278,7 +282,12 @@
 					{#if primaryEmail}<p>{primaryEmail}</p>{/if}
 				</div>
 
-				<VisitFields bind:adults={visitAdults} bind:children={visitChildren} bind:notes={visitNotes} />
+				<VisitFields
+					bind:adults={visitAdults}
+					bind:children={visitChildren}
+					bind:notes={visitNotes}
+					bind:attending={visitAttending}
+				/>
 
 				{#if submitError}
 					<p class="text-sm text-red-600">{submitError}</p>

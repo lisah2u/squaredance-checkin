@@ -45,7 +45,8 @@ export const VISIT_FIELDS = {
 	childrenThisVisit: 'Children This Visit',
 	checkInMethod: 'Check-in Method',
 	notes: 'Notes',
-	events: 'Events'
+	events: 'Events',
+	attending: 'Attending'
 };
 
 export const EVENT_FIELDS = {
@@ -60,3 +61,8 @@ export const CHECK_IN_METHODS = {
 	correction: 'Correction',
 	onlineRSVP: 'Online RSVP'
 };
+
+// Valid options for VISIT_FIELDS.attending (Airtable multiple select).
+// Defined in $lib/attending.js (not here) so client-side components can
+// import the same list without pulling in a server-only module.
+export { ATTENDING_OPTIONS } from '$lib/attending.js';

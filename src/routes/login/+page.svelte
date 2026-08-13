@@ -5,7 +5,7 @@
 	let submitting = $state(false);
 </script>
 
-<h1 class="text-xl font-semibold">Volunteer Login</h1>
+<h1 class="text-xl font-semibold">Staff Login</h1>
 
 <form
 	method="POST"

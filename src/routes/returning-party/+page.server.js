@@ -1,6 +1,9 @@
 import { fail } from '@sveltejs/kit';
-import { getPartyDetails, createVisit, findTodaysEvent, findOrCreateEvent } from '$lib/server/airtable.js';
+import { getPartyDetails, createVisit, findTodaysEvent } from '$lib/server/airtable.js';
 import { todaysEvent } from '$lib/utils/event.js';
+import { ATTENDING_OPTIONS } from '$lib/attending.js';
+
+const VALID_ATTENDING = new Set(Object.values(ATTENDING_OPTIONS));
 
 export async function load() {
 	const { visitDate } = todaysEvent();
@@ -9,21 +12,13 @@ export async function load() {
 }
 
 export const actions = {
-	// Only reachable while logged in (hooks.server.js gates all of /volunteer) —
-	// this is the one place today's Event record gets created, so check-in
-	// opening is always a deliberate, authenticated action.
-	openToday: async () => {
-		const { eventName, visitDate } = todaysEvent();
-		await findOrCreateEvent(eventName, visitDate);
-		return { opened: true };
-	},
-
 	checkIn: async ({ request }) => {
 		const data = await request.formData();
 		const partyId = data.get('partyId')?.toString() ?? '';
 		const adultsThisVisit = Number(data.get('adultsThisVisit'));
 		const childrenThisVisit = Number(data.get('childrenThisVisit'));
 		const notes = data.get('notes')?.toString() ?? '';
+		const attending = data.getAll('attending').map(String).filter((v) => VALID_ATTENDING.has(v));
 
 		if (!partyId) return fail(400, { error: 'No party selected.' });
 		if (!Number.isFinite(adultsThisVisit) || adultsThisVisit < 0) {
@@ -39,7 +34,7 @@ export const actions = {
 		// Re-checked here, not just in the UI: the Event row is what unlocks
 		// check-in, so a request racing past a stale page load must not slip through.
 		if (!event) {
-			return fail(423, { error: 'Check-in is locked — no dance is scheduled today in Airtable.' });
+			return fail(423, { error: 'Check-in is locked — please see staff at the door.' });
 		}
 
 		await createVisit(partyId, {
@@ -48,6 +43,7 @@ export const actions = {
 			adultsThisVisit,
 			childrenThisVisit,
 			notes,
+			attending,
 			eventId: event.id
 		});
 

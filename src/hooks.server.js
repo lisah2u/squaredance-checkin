@@ -1,8 +1,13 @@
 import { redirect, json } from '@sveltejs/kit';
 import { SESSION_COOKIE, isSessionValid } from '$lib/server/auth.js';
 
-const PROTECTED_PAGE_PREFIXES = ['/volunteer'];
-const PROTECTED_API_PREFIXES = ['/api/parties/search'];
+const PROTECTED_PAGE_PREFIXES = ['/staff'];
+// /api/parties/search is intentionally public — it backs the anonymous
+// /returning-party self-checkin flow. Results are trimmed server-side
+// (see searchParties in $lib/server/airtable.js) so it never exposes
+// email or visit history to anonymous callers.
+/** @type {string[]} */
+const PROTECTED_API_PREFIXES = [];
 
 /**
  * @param {string[]} prefixes

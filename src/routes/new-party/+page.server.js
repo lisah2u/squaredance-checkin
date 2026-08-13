@@ -2,8 +2,10 @@ import { fail } from '@sveltejs/kit';
 import { createParty, createAdults, createVisit, findTodaysEvent } from '$lib/server/airtable.js';
 import { sendCheckInConfirmation } from '$lib/server/email.js';
 import { todaysEvent } from '$lib/utils/event.js';
+import { ATTENDING_OPTIONS } from '$lib/attending.js';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const VALID_ATTENDING = new Set(Object.values(ATTENDING_OPTIONS));
 
 export async function load() {
 	const { visitDate } = todaysEvent();
@@ -27,6 +29,7 @@ export const actions = {
 		const adultsThisVisit = num('adultsThisVisit');
 		const childrenThisVisit = num('childrenThisVisit');
 		const primaryEmail = str('primaryEmail');
+		const attending = data.getAll('attending').map(String).filter((v) => VALID_ATTENDING.has(v));
 
 		if (!leadAdultName) return fail(400, { error: 'Lead adult name is required.' });
 		if (!city || !state) return fail(400, { error: 'City and state are required.' });
@@ -45,8 +48,8 @@ export const actions = {
 		}
 
 		const { eventName, visitDate } = todaysEvent();
-		// Re-checked here, not just in the UI: check-in only opens once a
-		// volunteer has logged in and created today's Event — see /volunteer.
+		// Re-checked here, not just in the UI: check-in only opens once
+		// staff have logged in and created today's Event — see /staff.
 		const event = await findTodaysEvent(visitDate);
 		if (!event) {
 			return fail(423, { error: 'Check-in is locked — no dance is scheduled today.' });
@@ -77,6 +80,7 @@ export const actions = {
 			adultsThisVisit,
 			childrenThisVisit,
 			notes: str('notes'),
+			attending,
 			eventId: event.id
 		});
 

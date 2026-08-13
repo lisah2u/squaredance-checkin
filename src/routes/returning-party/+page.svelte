@@ -8,18 +8,19 @@
 	/** @type {'search' | 'confirm' | 'success'} */
 	let step = $state('search');
 	let query = $state('');
-	/** @type {import('$lib/server/airtable.js').Party[]} */
+	/** @type {import('$lib/server/airtable.js').PublicParty[]} */
 	let results = $state([]);
 	let searching = $state(false);
-	/** @type {import('$lib/server/airtable.js').Party | null} */
+	/** @type {import('$lib/server/airtable.js').PublicParty | null} */
 	let selectedParty = $state(null);
 	let visitAdults = $state(0);
 	let visitChildren = $state(0);
 	let visitNotes = $state('');
+	/** @type {string[]} */
+	let visitAttending = $state([]);
 	let submitting = $state(false);
 	let errorMessage = $state('');
 	let successName = $state('');
-	let opening = $state(false);
 
 	/** @type {ReturnType<typeof setTimeout> | undefined} */
 	let debounceTimer;
@@ -43,12 +44,13 @@
 		}, 300);
 	}
 
-	/** @param {import('$lib/server/airtable.js').Party} party */
+	/** @param {import('$lib/server/airtable.js').PublicParty} party */
 	function selectParty(party) {
 		selectedParty = party;
 		visitAdults = party.adultsCount;
 		visitChildren = party.childrenCount;
 		visitNotes = '';
+		visitAttending = [];
 		step = 'confirm';
 	}
 
@@ -68,37 +70,12 @@
 	}
 </script>
 
-<div class="flex items-center justify-between">
-	<h1 class="text-xl font-semibold">Volunteer Check-In</h1>
-	<form method="POST" action="/logout">
-		<button type="submit" class="text-sm text-slate-500 hover:underline">Log out</button>
-	</form>
-</div>
+<h1 class="text-xl font-semibold">Returning Party</h1>
 
 {#if !data.checkInOpen}
 	<div class="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
-		<p class="font-medium">Check-in is locked</p>
-		<p class="mt-1 text-sm text-slate-600">No dance is scheduled for today yet.</p>
-		<form
-			method="POST"
-			action="?/openToday"
-			class="mt-4"
-			use:enhance={() => {
-				opening = true;
-				return async ({ update }) => {
-					opening = false;
-					await update();
-				};
-			}}
-		>
-			<button
-				type="submit"
-				disabled={opening}
-				class="rounded-md bg-slate-900 px-4 py-2 text-white disabled:opacity-50"
-			>
-				{opening ? 'Opening…' : "Open check-in for today's dance"}
-			</button>
-		</form>
+		<p class="font-medium">Check-in isn't open right now</p>
+		<p class="mt-1 text-sm text-slate-600">Please see staff at the door.</p>
 	</div>
 {:else if step === 'search'}
 	<p class="mt-2 text-sm text-slate-500">Search by name, city, or email.</p>
@@ -115,7 +92,7 @@
 		<p class="mt-3 text-sm text-slate-400">Searching…</p>
 	{:else if query.trim().length >= 2 && results.length === 0}
 		<p class="mt-3 text-sm text-slate-500">
-			No matches. Send them to <a href={resolve('/new-party')} class="underline">/new-party</a> instead.
+			No matches. First time here? Head to <a href={resolve('/new-party')} class="underline">New Party</a> instead.
 		</p>
 	{/if}
 
@@ -146,10 +123,6 @@
 			<p class="text-sm text-slate-600">Also: {selectedParty.additionalAdultNames}</p>
 		{/if}
 		<p class="text-sm text-slate-600">{[selectedParty.city, selectedParty.state].filter(Boolean).join(', ')}</p>
-		{#if selectedParty.primaryEmail}
-			<p class="text-sm text-slate-600">{selectedParty.primaryEmail}</p>
-		{/if}
-		<p class="mt-1 text-sm text-slate-400">Visited {selectedParty.totalVisits} time{selectedParty.totalVisits === 1 ? '' : 's'} before</p>
 	</div>
 
 	<form
@@ -175,7 +148,12 @@
 		}}
 	>
 		<input type="hidden" name="partyId" value={selectedParty.id} />
-		<VisitFields bind:adults={visitAdults} bind:children={visitChildren} bind:notes={visitNotes} />
+		<VisitFields
+			bind:adults={visitAdults}
+			bind:children={visitChildren}
+			bind:notes={visitNotes}
+			bind:attending={visitAttending}
+		/>
 
 		{#if errorMessage}
 			<p class="text-sm text-red-600">{errorMessage}</p>

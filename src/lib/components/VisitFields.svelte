@@ -1,5 +1,14 @@
 <script>
-	let { adults = $bindable(0), children = $bindable(0), notes = $bindable('') } = $props();
+	import { ATTENDING_OPTIONS } from '$lib/attending.js';
+
+	let {
+		adults = $bindable(0),
+		children = $bindable(0),
+		notes = $bindable(''),
+		attending = $bindable([])
+	} = $props();
+
+	const attendingChoices = Object.values(ATTENDING_OPTIONS);
 </script>
 
 <div class="space-y-4">
@@ -26,6 +35,17 @@
 				class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
 			/>
 		</label>
+	</div>
+	<div>
+		<span class="block text-sm font-medium text-slate-700">Attending (optional)</span>
+		<div class="mt-1 space-y-1">
+			{#each attendingChoices as choice (choice)}
+				<label class="flex items-center gap-2 text-sm text-slate-700">
+					<input type="checkbox" name="attending" value={choice} bind:group={attending} />
+					{choice}
+				</label>
+			{/each}
+		</div>
 	</div>
 	<label class="block">
 		<span class="text-sm font-medium text-slate-700">Notes (optional)</span>
