@@ -5,8 +5,9 @@ Check-in app for CMDF square dances, built on SvelteKit + Airtable. Self-service
 - **`/staff`** — staff log in (shared password) and type a title to create today's Event. This is the *only* thing this view does — it no longer searches or checks anyone in.
 - **`/new-party`** — a first-time visitor fills out their own info (self-service, e.g. via a QR code at the door), creating a Party + optional additional Adults + a Visit record. **No login.**
 - **`/returning-party`** — a returning visitor searches for their own party, confirms details, and records today's visit themselves. **No login** — this used to be the staff-only `/volunteer` flow; it's now anonymous self-service like `/new-party`. Search results are trimmed (name/city/state only — no email or visit history) since anyone at the door can use it.
+- **`/just-count`** — for visitors who'd rather not give their name (linked from the start screen as "Rather not give your name? Just count us"). Asks only adults/children/attending, plus an optional "where are you from" that goes into the Visit's Notes. Each submission is its own Visit linked to one shared Party named `Anonymous` (`findOrCreateAnonymousParty`), with same-day dedup turned off, since each one is a different family. **No login**, no Party created, nothing sent to Mailchimp. The Anonymous party is excluded from `/returning-party` search.
 
-All three routes only work once today's Event record exists in Airtable — see [Login & check-in lock](#login--check-in-lock). Every check-in links its Visit to that Event, so the Events table's rollups (Total Adults/Children/Parties) stay accurate. Each visit also records which of Workshop / Family Dance / Square Dance the party attended (`Attending`, optional, multi-select) — see `src/lib/attending.js`.
+All four routes only work once today's Event record exists in Airtable — see [Login & check-in lock](#login--check-in-lock). Every check-in links its Visit to that Event, so the Events table's rollups (Total Adults/Children/Parties) stay accurate. Each visit also records which of Workshop / Family Dance / Square Dance the party attended (`Attending`, optional, multi-select) — see `src/lib/attending.js`.
 
 ## Setup
 
@@ -48,7 +49,7 @@ npm run preview       # preview the production build locally
 - `src/lib/server/auth.js` — shared-password check and signed session-cookie helpers for the `/staff` login.
 - `src/hooks.server.js` — gates `/staff` behind a valid session cookie; everything else (`/new-party`, `/returning-party`, `/api/parties/search`) is public.
 - `src/lib/server/mailchimp.js` — `syncToMailchimp(email)`, called from both `/new-party` and `/returning-party` after a successful check-in. Adds the party's email to the CMDF Mailchimp audience via the same Marketing API v3 call `~/code/cmdf-website`'s `netlify/functions/subscribe.js` makes. Any "thank you" a party sees for signing up is a Mailchimp automation triggered by that add, not an email this app sends itself — cmdf-website doesn't send transactional email either, so there was no such pattern to copy. Failures are logged, not thrown, so a Mailchimp outage never blocks a check-in.
-- `src/routes/staff/`, `src/routes/new-party/`, `src/routes/returning-party/` — one SvelteKit form action per flow (`+page.server.js`), UI in `+page.svelte`. All use `$app/forms`'s `use:enhance` for progressive enhancement.
+- `src/routes/staff/`, `src/routes/new-party/`, `src/routes/returning-party/`, `src/routes/just-count/` — one SvelteKit form action per flow (`+page.server.js`), UI in `+page.svelte`. All use `$app/forms`'s `use:enhance` for progressive enhancement.
 - `src/routes/login/`, `src/routes/logout/` — the shared-password login form and a logout endpoint that clears the session cookie.
 - `src/lib/components/VisitFields.svelte` — the adults/children/attending/notes inputs shared by `/new-party` and `/returning-party`.
 

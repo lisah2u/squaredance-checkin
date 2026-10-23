@@ -22,6 +22,10 @@
 	</a>
 </div>
 
+<p class="mt-4 text-center text-sm text-slate-500">
+	Rather not give your name? <a href={resolve('/just-count')} class="underline hover:text-slate-700">Just count us</a>
+</p>
+
 <a
 	href={resolve('/staff')}
 	class="mt-4 flex items-center justify-center gap-2 rounded-lg border border-slate-200 p-4 text-center text-sm text-slate-500 hover:border-slate-300 hover:text-slate-700"

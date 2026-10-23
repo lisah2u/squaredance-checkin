@@ -60,6 +60,11 @@ import { TABLES, PARTY_FIELDS, ADULT_FIELDS, VISIT_FIELDS, EVENT_FIELDS, CHECK_I
  * @property {number} childrenCount
  */
 
+// Lead Adult Name of the one shared Party that /just-count visits link to,
+// for visitors who'd rather not give their name. Matches the record a
+// visitor made by hand at the 2026-08-15 dance, which Lisa chose to keep.
+export const ANONYMOUS_PARTY_NAME = 'Anonymous';
+
 function getBase() {
 	if (!env.AIRTABLE_API_KEY) {
 		throw new Error(
@@ -115,7 +120,9 @@ export async function searchParties(query) {
 	// the string literal early and lets the rest of the input run as formula
 	// syntax (e.g. an always-true clause that dumps every party, not just matches).
 	const escaped = trimmed.toLowerCase().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-	const filterByFormula = `FIND("${escaped}", LOWER({${PARTY_FIELDS.searchKey}})) > 0`;
+	// The shared Anonymous party (see findOrCreateAnonymousParty) is left out —
+	// it's not anyone's party to pick, and checking in as it would skip /just-count.
+	const filterByFormula = `AND(FIND("${escaped}", LOWER({${PARTY_FIELDS.searchKey}})) > 0, LOWER({${PARTY_FIELDS.leadAdultName}}) != "${ANONYMOUS_PARTY_NAME.toLowerCase()}")`;
 
 	const records = await getBase()(TABLES.parties)
 		.select({ filterByFormula, maxRecords: 20, sort: [{ field: PARTY_FIELDS.lastSeen, direction: 'desc' }] })
@@ -228,6 +235,27 @@ export async function findTodaysEvent(eventDate) {
 }
 
 /**
+ * Find the shared Anonymous party, creating it if it doesn't exist yet.
+ * @returns {Promise<string>} partyId
+ */
+export async function findOrCreateAnonymousParty() {
+	const existing = await getBase()(TABLES.parties)
+		.select({
+			filterByFormula: `LOWER({${PARTY_FIELDS.leadAdultName}}) = "${ANONYMOUS_PARTY_NAME.toLowerCase()}"`,
+			maxRecords: 1
+		})
+		.all();
+	if (existing.length > 0) return existing[0].id;
+
+	const record = await getBase()(TABLES.parties).create({
+		[PARTY_FIELDS.leadAdultName]: ANONYMOUS_PARTY_NAME,
+		[PARTY_FIELDS.adultsCount]: 0,
+		[PARTY_FIELDS.childrenCount]: 0
+	});
+	return record.id;
+}
+
+/**
  * Find an existing Visit for this party on the given date, if any. Used so a
  * party checking in twice the same day (e.g. via /new-party, then found and
  * checked in again via /returning-party) updates that Visit instead of
@@ -263,8 +291,10 @@ async function findTodaysVisitForParty(partyId, visitDate) {
  * rather than creating a duplicate.
  * @param {string} partyId
  * @param {NewVisitInput} visit
+ * @param {{ dedupe?: boolean }} [options] - pass `dedupe: false` for the
+ *   shared Anonymous party, where each visit that night is a different family
  */
-export async function recordVisit(partyId, visit) {
+export async function recordVisit(partyId, visit, { dedupe = true } = {}) {
 	const fields = {
 		[VISIT_FIELDS.linkedParty]: [partyId],
 		[VISIT_FIELDS.eventName]: visit.eventName,
@@ -277,7 +307,7 @@ export async function recordVisit(partyId, visit) {
 		[VISIT_FIELDS.attending]: visit.attending?.length ? visit.attending : undefined
 	};
 
-	const existing = await findTodaysVisitForParty(partyId, visit.visitDate);
+	const existing = dedupe ? await findTodaysVisitForParty(partyId, visit.visitDate) : null;
 	const record = existing
 		? await getBase()(TABLES.visits).update(existing.id, fields)
 		: await getBase()(TABLES.visits).create(fields);
