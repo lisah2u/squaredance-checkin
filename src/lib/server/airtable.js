@@ -198,7 +198,8 @@ export async function createAdults(partyId, adults) {
  * so the Events table's rollups (Total Adults/Children/Parties) work.
  * @param {string} eventName
  * @param {string} eventDate - YYYY-MM-DD
- * @returns {Promise<string>} eventId
+ * @returns {Promise<{id: string, eventName: string, created: boolean}>} - an
+ *   existing Event keeps its original name; `eventName` is that one
  */
 export async function findOrCreateEvent(eventName, eventDate) {
 	const existing = await getBase()(TABLES.events)
@@ -207,19 +208,47 @@ export async function findOrCreateEvent(eventName, eventDate) {
 			maxRecords: 1
 		})
 		.all();
-	if (existing.length > 0) return existing[0].id;
+	if (existing.length > 0) {
+		return {
+			id: existing[0].id,
+			eventName: String(existing[0].get(EVENT_FIELDS.eventName) ?? ''),
+			created: false
+		};
+	}
 
 	const record = await getBase()(TABLES.events).create({
 		[EVENT_FIELDS.eventName]: eventName,
 		[EVENT_FIELDS.eventDate]: eventDate
 	});
-	return record.id;
+	return { id: record.id, eventName, created: true };
+}
+
+/**
+ * Events on or after a date, soonest first — the dances already scheduled,
+ * shown on /staff so whoever schedules one can see what's set.
+ * @param {string} fromDate - YYYY-MM-DD
+ * @returns {Promise<{id: string, eventName: string, eventDate: string}[]>}
+ */
+export async function listUpcomingEvents(fromDate) {
+	const records = await getBase()(TABLES.events)
+		.select({
+			filterByFormula: `NOT(IS_BEFORE({${EVENT_FIELDS.eventDate}}, "${fromDate}"))`,
+			sort: [{ field: EVENT_FIELDS.eventDate, direction: 'asc' }],
+			maxRecords: 20
+		})
+		.all();
+	return records.map((r) => ({
+		id: r.id,
+		eventName: String(r.get(EVENT_FIELDS.eventName) ?? ''),
+		eventDate: String(r.get(EVENT_FIELDS.eventDate) ?? '')
+	}));
 }
 
 /**
  * Look up (but do not create) the Event for a given date. Used to gate
  * check-in on a dance actually being scheduled — see src/lib/server/auth.js
- * and the /staff route for the login/lock design.
+ * and the /staff route for the login/lock design. Staff can schedule an
+ * Event ahead of time; check-in opens on its date with no one logging in.
  * @param {string} eventDate - YYYY-MM-DD
  * @returns {Promise<{id: string, eventName: string} | null>}
  */
