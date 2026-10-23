@@ -34,6 +34,7 @@ import { TABLES, PARTY_FIELDS, ADULT_FIELDS, VISIT_FIELDS, EVENT_FIELDS, CHECK_I
  * @property {boolean} [disability]
  * @property {boolean} [armedServices]
  * @property {boolean} [veteran]
+ * @property {string} [firstSeen] - YYYY-MM-DD
  */
 
 /**
@@ -157,7 +158,8 @@ export async function createParty(party) {
 		[PARTY_FIELDS.howDidYouHear]: party.howDidYouHear || undefined,
 		[PARTY_FIELDS.disability]: !!party.disability,
 		[PARTY_FIELDS.armedServices]: !!party.armedServices,
-		[PARTY_FIELDS.veteran]: !!party.veteran
+		[PARTY_FIELDS.veteran]: !!party.veteran,
+		[PARTY_FIELDS.firstSeen]: party.firstSeen || undefined
 	});
 	return partyFromRecord(record);
 }
@@ -235,18 +237,24 @@ export async function findTodaysEvent(eventDate) {
  * @returns {Promise<{id: string} | null>}
  */
 async function findTodaysVisitForParty(partyId, visitDate) {
-	// partyId can come from user-submitted form data (returning-party's hidden
-	// field) and is interpolated into the formula below, so validate its shape
-	// first — same reasoning as the escaping in searchParties.
-	if (!/^rec[A-Za-z0-9]{14}$/.test(partyId)) return null;
-
+	// Filter by date in Airtable, then match the party in code. A formula can't
+	// match on the link itself: inside a formula, {Linked Party} evaluates to the
+	// linked Parties' primary field (Party Search Key text), not their record
+	// IDs — so FIND(partyId, ARRAYJOIN({Linked Party})) never matched, and every
+	// repeat check-in created a duplicate Visit (seen live at the 2026-08-15 dance).
+	// The REST API's record JSON does return link fields as record IDs.
+	// One night's visits is a few dozen rows, so fetching them all is cheap.
 	const records = await getBase()(TABLES.visits)
 		.select({
-			filterByFormula: `AND(FIND("${partyId}", ARRAYJOIN({${VISIT_FIELDS.linkedParty}})) > 0, IS_SAME({${VISIT_FIELDS.visitDate}}, "${visitDate}", 'day'))`,
-			maxRecords: 1
+			filterByFormula: `IS_SAME({${VISIT_FIELDS.visitDate}}, "${visitDate}", 'day')`,
+			fields: [VISIT_FIELDS.linkedParty]
 		})
 		.all();
-	return records.length ? { id: records[0].id } : null;
+	const match = records.find((r) => {
+		const linked = /** @type {string[] | undefined} */ (r.get(VISIT_FIELDS.linkedParty));
+		return linked?.includes(partyId);
+	});
+	return match ? { id: match.id } : null;
 }
 
 /**
@@ -273,6 +281,11 @@ export async function recordVisit(partyId, visit) {
 	const record = existing
 		? await getBase()(TABLES.visits).update(existing.id, fields)
 		: await getBase()(TABLES.visits).create(fields);
+
+	// First Seen / Last Seen are plain date fields (set once by the historical
+	// import), not rollups, so nothing keeps them current unless we write them.
+	// Search results sort on Last Seen. First Seen is set by createParty.
+	await getBase()(TABLES.parties).update(partyId, { [PARTY_FIELDS.lastSeen]: visit.visitDate });
 
 	return { id: record.id, eventName: record.get(VISIT_FIELDS.eventName), updated: Boolean(existing) };
 }

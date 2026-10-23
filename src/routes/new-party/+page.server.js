@@ -66,7 +66,8 @@ export const actions = {
 			howDidYouHear: str('howDidYouHear'),
 			disability: data.get('disability') === 'on',
 			armedServices: data.get('armedServices') === 'on',
-			veteran: data.get('veteran') === 'on'
+			veteran: data.get('veteran') === 'on',
+			firstSeen: visitDate
 		});
 
 		const additionalAdults = [1, 2, 3]

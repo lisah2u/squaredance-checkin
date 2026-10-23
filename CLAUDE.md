@@ -4,7 +4,7 @@ Building a check-in system for CMDF square dances: Airtable (backend) + Front-en
 
 ## Before starting work
 
-Read the plan first: `~/code/dev-vault/dev-vault/00_Inbox/in-progress/Square Dance Check-in with mailchimp integration.md`
+Read the plan first: `~/code/dev-vault/dev-vault/Atlas 🧠/🤝 Customer Success & Experience/Square Dance Check-in with mailchimp integration.md`
 
 It is the source of truth for the data model, view/field mapping, and Mailchimp sync design. It is not perfect — deviate from it when Airtable's actual behavior forces a different approach, but note the deviation (see below).
 
