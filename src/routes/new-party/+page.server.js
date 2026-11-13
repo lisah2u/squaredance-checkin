@@ -1,6 +1,6 @@
 import { fail } from '@sveltejs/kit';
 import { createParty, createAdults, recordVisit, findTodaysEvent } from '$lib/server/airtable.js';
-import { syncToMailchimp } from '$lib/server/mailchimp.js';
+import { syncToZeffy } from '$lib/server/zeffy.js';
 import { todaysEvent } from '$lib/utils/event.js';
 import { ATTENDING_OPTIONS } from '$lib/attending.js';
 
@@ -85,7 +85,7 @@ export const actions = {
 			eventId: event.id
 		});
 
-		await syncToMailchimp(party.primaryEmail);
+		await syncToZeffy(party.primaryEmail);
 
 		return { success: true, leadAdultName: party.leadAdultName };
 	}

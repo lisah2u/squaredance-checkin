@@ -1,6 +1,6 @@
 # Square Dance Check-In App
 
-Building a check-in system for CMDF square dances: Airtable (backend) + Front-end + Mailchimp (newsletter sync on adult check-in).
+Building a check-in system for CMDF square dances: Airtable (backend) + Front-end + Zeffy (newsletter contact sync on adult check-in; was Mailchimp until 2026-11-13).
 
 ## Before starting work
 

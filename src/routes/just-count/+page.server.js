@@ -14,7 +14,7 @@ export async function load() {
 export const actions = {
 	// For visitors who'd rather not give their name: records only head counts,
 	// linked to the one shared Anonymous party. No Party is created and nothing
-	// is sent to Mailchimp.
+	// is sent to Zeffy.
 	count: async ({ request }) => {
 		const data = await request.formData();
 		const adultsThisVisit = Number(data.get('adultsThisVisit'));
